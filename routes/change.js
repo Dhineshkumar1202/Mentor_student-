@@ -4,23 +4,33 @@ const Student = require('../models/Student');
 const router = express.Router();
 
 
-router.post('/change-mentor', async (req, res) => {
-  const { studentId, mentorId } = req.body;
-
+router.put('/change-mentor/:studentId/:newMentorId', async (req, res) => {
+  const { studentId, newMentorId } = req.params;
   try {
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).send('Student not found');
+      const student = await Student.findById(studentId);
+      const newMentor = await Mentor.findById(newMentorId);
 
-    const mentor = await Mentor.findById(mentorId);
-    if (!mentor) return res.status(404).send('Mentor not found');
+      if (!student || !newMentor) {
+          return res.status(404).json({ error: 'Student or mentor not found' });
+      }
 
-    student.previousMentors.push(student.mentor); 
-    student.mentor = mentor._id;
+      
+      if (student.mentor) {
+          const previousMentor = await Mentor.findById(student.mentor);
+          previousMentor.students = previousMentor.students.filter(s => s.toString() !== student._id.toString());
+          await previousMentor.save();
+      }
 
-    await student.save();
-    res.status(200).send(student);
+     
+      student.mentor = newMentor._id;
+      await student.save();
+
+      newMentor.students.push(student._id);
+      await newMentor.save();
+
+      res.status(200).json({ student, newMentor });
   } catch (err) {
-    res.status(400).send(err);
+      res.status(500).json({ error: err.message });
   }
 });
 
